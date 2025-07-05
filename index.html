@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vòng Quay May Mắn - Bảo Ngọc</title>
+    <!-- Tailwind CSS CDN for utility classes -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for 'Be Vietnam Pro' -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for the application */
+        body { 
+            font-family: 'Be Vietnam Pro', sans-serif; 
+        }
+        /* Container for the spinning wheel */
+        .wheel-container { 
+            position: relative; 
+            width: 350px; 
+            height: 350px; 
+            border-radius: 50%; 
+            overflow: hidden; 
+            border: 10px solid #facc15; /* Yellow border */
+            box-shadow: 0 0 20px rgba(0,0,0,0.2); 
+        }
+        /* The wheel itself, with transition for spinning animation */
+        .wheel { 
+            width: 100%; 
+            height: 100%; 
+            position: relative; 
+            border-radius: 50%; 
+            transition: transform 5s ease-out; /* Smooth spinning animation */
+        }
+        /* Individual segments of the wheel */
+        .segment { 
+            position: absolute; 
+            width: 50%; 
+            height: 50%; 
+            top: 0; 
+            left: 50%; 
+            transform-origin: 0 100%; /* Pivot point for rotation */
+            /* Clip path to create pie slice shape */
+            clip-path: polygon(0 0, 100% 0, 100% 1.5%, 0 100%); 
+            display: flex; 
+            justify-content: center; 
+            align-items: flex-start; 
+            padding-top: 10px; 
+        }
+        /* Label for each segment */
+        .segment-label { 
+            /* Rotate and translate to align text correctly within the segment */
+            transform: rotate(45deg) translate(5px, 5px); 
+            font-size: 10px; 
+            font-weight: 600; 
+            color: white; 
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5); 
+            text-align: center; 
+            max-width: 80px; 
+        }
+        /* The pointer indicating the winning segment */
+        .pointer { 
+            position: absolute; 
+            top: -5px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            width: 0; 
+            height: 0; 
+            border-left: 20px solid transparent; 
+            border-right: 20px solid transparent; 
+            border-top: 30px solid #ef4444; /* Red triangle shape */
+            z-index: 10; 
+        }
+        /* Backdrop for modal popups */
+        .modal-backdrop { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background-color: rgba(0, 0, 0, 0.6); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 50; 
+        }
+        /* Content area for modal popups */
+        .modal-content { 
+            background-color: white; 
+            padding: 2rem; 
+            border-radius: 0.5rem; 
+            text-align: center; 
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+            max-width: 90%; 
+            width: 400px; 
+        }
+        /* Overlay for disabled app state (e.g., outside program dates) */
+        .disabled-overlay { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            bottom: 0; 
+            background: rgba(255, 255, 255, 0.8); 
+            z-index: 40; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            text-align: center; 
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Main application container -->
+    <div id="app" class="container mx-auto p-4 max-w-4xl relative">
+        <!-- Loader displayed while app is initializing -->
+        <div id="app-loader" class="text-center py-10">
+            <p class="text-lg font-semibold">Đang tải chương trình...</p>
+        </div>
+
+        <!-- Main content of the application, hidden initially -->
+        <div id="app-content" class="hidden">
+            <!-- Header section for the pharmacy branding -->
+            <div class="text-center my-6 p-4 bg-white rounded-lg shadow-md">
+                <h2 class="text-3xl font-bold text-blue-700">Nhà thuốc Bảo Ngọc</h2>
+                <p class="text-xl text-gray-800 font-semibold">OffiSanté Bảo Ngọc VN</p>
+                <p class="text-md italic text-gray-500 mt-1">"Always there to care"</p>
+            </div>
+
+            <!-- Program title and description -->
+            <header class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-red-600">CHƯƠNG TRÌNH QUAY SỐ TRÚNG THƯỞNG</h1>
+                <p class="text-lg text-gray-600 mt-2">Đăng ký ngay để nhận lượt quay và có cơ hội rinh về những phần quà giá trị!</p>
+            </header>
+
+            <!-- Section for registration form and QR code -->
+            <div id="main-content">
+                <!-- Registration Form -->
+                <div id="registration-form" class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto">
+                    <h2 class="text-2xl font-bold mb-6 text-center">Thông Tin Đăng Ký</h2>
+                    <form id="register">
+                        <div class="mb-4">
+                            <label for="name" class="block text-gray-700 font-medium mb-2">Họ và Tên</label>
+                            <input type="text" id="name" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div class="mb-6">
+                            <label for="phone" class="block text-gray-700 font-medium mb-2">Số Điện Thoại</label>
+                            <input type="tel" id="phone" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <button type="submit" id="register-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-300">Đăng Ký & Nhận Lượt Quay</button>
+                    </form>
+                </div>
+                <!-- QR Code Section -->
+                <div id="qr-code-section" class="bg-white p-6 rounded-lg shadow-md max-w-md mx-auto mt-8 text-center">
+                    <h3 class="text-xl font-bold mb-4">Hoặc quét mã để tham gia</h3>
+                    <div class="flex justify-center"><img id="qr-code-img" src="" alt="QR Code"></div>
+                    <p class="text-sm text-gray-500 mt-2">Quét mã QR bằng camera điện thoại của bạn</p>
+                </div>
+            </div>
+
+            <!-- Lucky Wheel Section, hidden initially -->
+            <div id="lucky-wheel-section" class="hidden">
+                <div class="flex flex-col lg:flex-row items-center justify-around gap-8">
+                    <div class="flex flex-col items-center">
+                        <!-- Wheel container with pointer -->
+                        <div class="relative w-[350px] h-[350px]">
+                            <div class="pointer"></div>
+                            <div class="wheel-container">
+                                <div id="wheel" class="wheel"></div>
+                            </div>
+                        </div>
+                        <!-- Spin button -->
+                        <button id="spin-btn" class="mt-8 bg-red-600 text-white font-bold py-4 px-10 rounded-full text-xl shadow-lg hover:bg-red-700 transition transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none">QUAY!</button>
+                        <!-- Display for remaining turns -->
+                        <p id="turns-left" class="mt-4 text-lg font-medium">Số lượt quay của bạn: <span class="font-bold text-blue-600">0</span></p>
+                    </div>
+                    <!-- Program Info and Share Button -->
+                    <div class="w-full lg:w-1/3 bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-bold mb-4 border-b pb-2">Thông Tin Chương Trình</h3>
+                        <div class="mb-4">
+                            <button id="share-btn" class="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition duration-300">Chia sẻ & Nhận thêm 1 lượt</button>
+                        </div>
+                        <div>
+                            <h4 class="text-lg font-bold mb-2">Danh Sách Phần Thưởng</h4>
+                            <ul id="prize-list" class="space-y-2 text-sm"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Disabled app overlay, shown when outside program dates or system error -->
+        <div id="disabled-app-overlay" class="disabled-overlay hidden">
+            <div class="bg-white p-8 rounded-lg shadow-xl">
+                <h2 id="disabled-title" class="text-2xl font-bold text-red-600 mb-2"></h2>
+                <p id="disabled-message" class="text-gray-700"></p>
+            </div>
+        </div>
+
+        <!-- Result/Info Modal -->
+        <div id="result-modal" class="modal-backdrop hidden">
+            <div id="modal-content" class="modal-content">
+                <h2 id="modal-title" class="text-2xl font-bold mb-2"></h2>
+                <div id="modal-body"></div>
+                <button id="close-modal-btn" class="mt-6 bg-gray-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-600 transition">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs (Compat versions for global access) -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+
+    <!-- Main Application Script (NO type="module") -->
+    <script>
+        // --- CONFIGURATION ---
+        // Program start and end dates (Vietnam time, GMT+7)
+        const START_DATE = new Date('2025-07-04T00:00:00+07:00'); 
+        const END_DATE = new Date('2025-08-08T23:59:59+07:00');
+        // App ID provided by the Canvas environment, or a default for local testing
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'lucky-draw-default';
+        // Firebase configuration provided by the Canvas environment
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // Initial authentication token from Canvas environment
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- DOM ELEMENTS ---
+        const appLoader = document.getElementById('app-loader');
+        const appContent = document.getElementById('app-content');
+        const disabledOverlay = document.getElementById('disabled-app-overlay');
+        const mainContent = document.getElementById('main-content');
+        const luckyWheelSection = document.getElementById('lucky-wheel-section');
+        const registerFormEl = document.getElementById('register');
+        const registerBtn = document.getElementById('register-btn');
+        const spinBtn = document.getElementById('spin-btn');
+        const shareBtn = document.getElementById('share-btn');
+        const wheel = document.getElementById('wheel');
+        const turnsLeftDisplay = document.querySelector('#turns-left span');
+        const prizeListUl = document.getElementById('prize-list');
+        const resultModal = document.getElementById('result-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const qrCodeImg = document.getElementById('qr-code-img');
+
+        // --- FIREBASE & APPLICATION STATE ---
+        let db, auth; // Firebase Firestore and Auth instances
+        let prizes = []; // Array to store current prize inventory
+        // User state: turns, whether they've shared, phone number, and name
+        let userState = { turns: 0, hasShared: false, phone: null, name: null };
+
+        // Initial prize definitions with quantities and colors
+        const initialPrizes = [
+            { id: 'prize01', name: 'Phiếu quà tặng 5.000đ', quantity: 30, color: '#3498db', order: 1 }, 
+            { id: 'prize02', name: 'Nước muối Vĩnh Phúc 500ml', quantity: 20, color: '#2ecc71', order: 2 },
+            { id: 'prize03', name: 'Phiếu quà tặng 10.000đ', quantity: 10, color: '#f1c40f', order: 3 },
+            { id: 'prize04', name: 'Dầu thái trắng Lee Chuang Oil', quantity: 20, color: '#e74c3c', order: 4 },
+            { id: 'prize05', name: 'Phiếu quà tặng 20.000đ', quantity: 10, color: '#9b59b6', order: 5 },
+            { id: 'prize06', name: 'Sâm Hàn Quốc 6 tuổi', quantity: 10, color: '#e67e22', order: 6 },
+            { id: 'prize07', name: 'Phiếu quà tặng 50.000đ', quantity: 5, color: '#1abc9c', order: 7 },
+            { id: 'prize08', name: 'Phiếu quà tặng 1.000đ', quantity: 30, color: '#a5b4fc', order: 8 }, 
+            { id: 'prize09', name: 'Phiếu quà tặng 2.000đ', quantity: 30, color: '#7dd3fc', order: 9 }, 
+            { id: 'prize10', name: 'Hủ hít Hongthai 5g', quantity: 5, color: '#f9a8d4', order: 10 },
+            { id: 'prize11', name: 'Chúc bạn may mắn lần sau', quantity: 20, color: '#bdc3c7', order: 11 }, // New prize added
+        ];
+
+        // --- FUNCTIONS ---
+
+        /**
+         * Checks if the current date is within the program's start and end dates.
+         * Displays a disabled view if outside the valid period.
+         * @returns {boolean} True if within the program dates, false otherwise.
+         */
+        function checkProgramTime() {
+            const now = new Date();
+            if (now < START_DATE) {
+                showDisabledView("Chương trình chưa bắt đầu", `Vui lòng quay lại sau ngày ${START_DATE.toLocaleDateString('vi-VN')}.`);
+                return false;
+            }
+            if (now > END_DATE) {
+                showDisabledView("Chương trình đã kết thúc", `Cảm ơn bạn đã quan tâm.`);
+                return false;
+            }
+            return true;
+        }
+
+        /**
+         * Displays the disabled overlay with a given title and message.
+         * Hides the loader and main content.
+         * @param {string} title - The title for the disabled message.
+         * @param {string} message - The message explaining why the app is disabled.
+         */
+        function showDisabledView(title, message) {
+            appLoader.classList.add('hidden');
+            appContent.classList.add('hidden');
+            document.getElementById('disabled-title').textContent = title;
+            document.getElementById('disabled-message').textContent = message;
+            disabledOverlay.classList.remove('hidden');
+        }
+
+        /**
+         * Initializes Firebase and authenticates the user.
+         * Tries to sign in with a custom token if available, otherwise signs in anonymously.
+         * @returns {Promise<boolean>} True if Firebase initialized successfully, false otherwise.
+         */
+        async function initializeFirebase() {
+            try {
+                // Initialize Firebase app using the global 'firebase' object
+                const app = firebase.initializeApp(firebaseConfig);
+                // Get Firestore and Auth services from the initialized app
+                db = app.firestore(); 
+                auth = app.auth();   
+
+                if (initialAuthToken) {
+                    await auth.signInWithCustomToken(initialAuthToken);
+                } else {
+                    await auth.signInAnonymously();
+                }
+                console.log("Firebase initialized and user signed in.");
+                return true;
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                showDisabledView("Lỗi Hệ Thống", "Không thể kết nối đến máy chủ. Vui lòng tải lại trang.");
+                return false;
+            }
+        }
+
+        /**
+         * Initializes the prize inventory in Firestore if it doesn't exist.
+         * Sets up a real-time listener (onSnapshot) for prize updates.
+         */
+        async function initializePrizes() {
+            // Get a reference to the prize inventory document using compat API
+            const prizeDocRef = db.collection(`artifacts/${appId}/public/data/prizes`).doc('inventory'); 
+
+            // Get the document snapshot
+            const prizeDoc = await prizeDocRef.get(); 
+
+            // If prize inventory doesn't exist, create it with initial data
+            if (!prizeDoc.exists) { 
+                const prizeData = {};
+                initialPrizes.forEach(p => { prizeData[p.id] = p; });
+                await prizeDocRef.set({ all: prizeData }); // Set the document
+                console.log("Initial prizes set in Firestore.");
+            }
+
+            // Listen for real-time updates to the prize inventory
+            prizeDocRef.onSnapshot((doc) => { 
+                const prizeData = doc.data().all;
+                // Sort prizes by their defined order
+                prizes = Object.values(prizeData).sort((a, b) => a.order - b.order);
+                updatePrizeList(); // Update the displayed prize list
+                createWheel();     // Re-create the wheel with updated prizes
+            });
+        }
+        
+        /**
+         * Updates the UI elements based on the current user state.
+         * This includes turns left, and the state of spin and share buttons.
+         */
+        function updateUI() {
+            turnsLeftDisplay.textContent = userState.turns;
+            // Disable spin button if no turns left or wheel is spinning
+            spinBtn.disabled = userState.turns <= 0 || spinBtn.dataset.spinning === 'true';
+            // Disable share button if user has already shared
+            shareBtn.disabled = userState.hasShared;
+            if(userState.hasShared) {
+                shareBtn.textContent = 'Đã Nhận Thưởng Chia Sẻ';
+                shareBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
+            } else {
+                shareBtn.textContent = 'Chia sẻ & Nhận thêm 1 lượt';
+                shareBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+            }
+        }
+
+        /**
+         * Updates the list of prizes displayed on the page.
+         * Shows prize name and remaining quantity.
+         */
+        function updatePrizeList() {
+            prizeListUl.innerHTML = ''; // Clear existing list
+            prizes.forEach(p => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center';
+                // Display prize name and quantity, with different colors based on availability
+                li.innerHTML = `<span>🎁 ${p.name}</span><span class="font-bold px-2 py-1 rounded text-xs ${p.quantity > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">Còn: ${p.quantity}</span>`;
+                prizeListUl.appendChild(li);
+            });
+        }
+
+        /**
+         * Dynamically creates the segments of the lucky wheel based on the `prizes` array.
+         * Each segment gets a background color and displays the prize name.
+         */
+        function createWheel() {
+            wheel.innerHTML = ''; // Clear existing segments
+            const totalPrizes = prizes.length;
+            const angle = 360 / totalPrizes; // Angle for each segment
+            prizes.forEach((prize, i) => {
+                const segment = document.createElement('div');
+                segment.className = 'segment';
+                segment.style.transform = `rotate(${angle * i}deg)`; // Rotate each segment
+                segment.style.backgroundColor = prize.color;
+                const label = document.createElement('div');
+                label.className = 'segment-label';
+                label.textContent = prize.name;
+                segment.appendChild(label);
+                wheel.appendChild(segment);
+            });
+        }
+
+        /**
+         * Handles the user registration form submission.
+         * Validates phone number, checks for existing users, and registers new ones.
+         * Grants 1 spin upon successful registration.
+         * @param {Event} e - The form submission event.
+         */
+        async function handleRegistration(e) {
+            e.preventDefault();
+            registerBtn.disabled = true;
+            registerBtn.textContent = 'Đang kiểm tra...';
+
+            const name = document.getElementById('name').value.trim();
+            const phone = document.getElementById('phone').value.trim().replace(/\s/g, ''); // Remove spaces from phone number
+
+            // Basic phone number validation (10 digits)
+            if (!/^\d{10}$/.test(phone)) {
+                showSimpleModal("Lỗi", "Vui lòng nhập số điện thoại hợp lệ (10 số).");
+                registerBtn.disabled = false;
+                registerBtn.textContent = 'Đăng Ký & Nhận Lượt Quay';
+                return;
+            }
+
+            // Get a reference to the user document using compat API
+            const userDocRef = db.collection(`artifacts/${appId}/public/data/users`).doc(phone);
+            try {
+                // Get the user document snapshot
+                const userDoc = await userDocRef.get();
+
+                if (userDoc.exists) { // Check if user exists
+                    showSimpleModal("Thông Báo", "Số điện thoại này đã được sử dụng để tham gia. Mỗi SĐT chỉ được tham gia một lần.");
+                    registerBtn.disabled = false;
+                    registerBtn.textContent = 'Đăng Ký & Nhận Lượt Quay';
+                } else {
+                    // Register new user with 1 turn and current timestamp
+                    await userDocRef.set({ // Set the user document
+                        name: name, 
+                        phone: phone, 
+                        turns: 1, // Grant 1 turn on registration
+                        hasShared: false, // User hasn't shared yet
+                        registeredAt: new Date(),
+                        wins: [] // To store prizes won by this user
+                    });
+                    userState = { ...userState, name, phone, turns: 1, hasShared: false };
+                    mainContent.classList.add('hidden'); // Hide registration form
+                    luckyWheelSection.classList.remove('hidden'); // Show lucky wheel
+                    updateUI(); // Update UI with new turns
+                    showSimpleModal('Đăng Ký Thành Công!', `Chào ${name}, bạn đã nhận được 1 lượt quay. Chúc bạn may mắn!`);
+                }
+            } catch (error) {
+                console.error("Error during registration:", error);
+                showSimpleModal("Lỗi", "Có lỗi xảy ra khi đăng ký. Vui lòng thử lại.");
+                registerBtn.disabled = false;
+                registerBtn.textContent = 'Đăng Ký & Nhận Lượt Quay';
+            }
+        }
+        
+        /**
+         * Handles the share action. Grants an additional turn if the user hasn't shared before.
+         * Updates the user's document in Firestore.
+         */
+        async function handleShare() {
+            if (userState.hasShared || !userState.phone) {
+                showSimpleModal('Thông báo', 'Bạn đã nhận thưởng chia sẻ hoặc chưa đăng ký.');
+                return;
+            }
+
+            shareBtn.disabled = true; // Disable button immediately
+            shareBtn.textContent = 'Đang xử lý...';
+
+            // Get a reference to the user document using compat API
+            const userDocRef = db.collection(`artifacts/${appId}/public/data/users`).doc(userState.phone);
+            try {
+                // Run a Firestore transaction to ensure atomic update
+                await db.runTransaction(async (transaction) => { 
+                    const userDoc = await transaction.get(userDocRef); // Get user document within transaction
+                    if (!userDoc.exists) {
+                        throw "User document not found.";
+                    }
+                    const userData = userDoc.data();
+                    if (userData.hasShared) {
+                        throw "User has already received share bonus.";
+                    }
+
+                    // Update user's turns and set hasShared to true within the transaction
+                    transaction.update(userDocRef, { 
+                        turns: (userData.turns || 0) + 1, 
+                        hasShared: true 
+                    });
+                });
+
+                userState.hasShared = true;
+                userState.turns++;
+                updateUI();
+                showSimpleModal('Thành Công!', 'Cảm ơn bạn đã chia sẻ. Bạn được tặng thêm 1 lượt quay!');
+            } catch (error) {
+                console.error("Error handling share:", error);
+                showSimpleModal("Lỗi", "Có lỗi xảy ra khi chia sẻ. Vui lòng thử lại.");
+                userState.hasShared = false; // Revert state if transaction fails
+            } finally {
+                updateUI(); // Ensure UI is updated after attempt
+            }
+        }
+
+        /**
+         * Handles the spinning of the wheel.
+         * Uses a Firestore transaction to decrement prize quantity and user's turns.
+         * Animates the wheel and displays the winning prize.
+         */
+        async function spinWheel() {
+            if (userState.turns <= 0 || spinBtn.dataset.spinning === 'true') {
+                showSimpleModal('Thông báo', 'Bạn không còn lượt quay hoặc vòng quay đang hoạt động.');
+                return;
+            }
+            
+            spinBtn.dataset.spinning = 'true'; // Set spinning flag
+            updateUI(); // Disable spin button
+
+            try {
+                // Run a Firestore transaction for atomic updates
+                const winningPrize = await db.runTransaction(async (transaction) => { 
+                    // Read all necessary documents first (Firestore transactions require all reads before all writes)
+                    const prizesRef = db.collection(`artifacts/${appId}/public/data/prizes`).doc('inventory'); 
+                    const prizesDoc = await transaction.get(prizesRef); 
+                    if (!prizesDoc.exists) {
+                        throw "Error: Prize inventory not found.";
+                    }
+                    
+                    const userDocRef = db.collection(`artifacts/${appId}/public/data/users`).doc(userState.phone); 
+                    const userDoc = await transaction.get(userDocRef); 
+                    if (!userDoc.exists) {
+                        throw "User document not found during spin.";
+                    }
+
+                    let currentPrizesData = prizesDoc.data().all;
+                    // Filter for prizes that still have quantity > 0
+                    let availablePrizes = Object.values(currentPrizesData).filter(p => p.quantity > 0);
+                    
+                    if (availablePrizes.length === 0) {
+                        showSimpleModal('Rất Tiếc!', 'Tất cả phần quà đã được phát hết.');
+                        return null; // No available prizes
+                    }
+
+                    // Select a random prize from available ones
+                    const randomPrize = availablePrizes[Math.floor(Math.random() * availablePrizes.length)];
+                    currentPrizesData[randomPrize.id].quantity--; // Decrement quantity of the chosen prize
+                    
+                    // Now perform all writes within the transaction
+                    transaction.update(prizesRef, { all: currentPrizesData }); // Update prize inventory in Firestore
+
+                    const userData = userDoc.data();
+                    const newTurns = (userData.turns || 0) - 1;
+                    const newWins = [...(userData.wins || []), { 
+                        prizeId: randomPrize.id, 
+                        prizeName: randomPrize.name, 
+                        timestamp: new Date() 
+                    }];
+                    transaction.update(userDocRef, { turns: newTurns, wins: newWins }); 
+
+                    return randomPrize; // Return the winning prize
+                });
+
+                if (winningPrize) {
+                    // Calculate rotation for the wheel animation
+                    const winningSegmentIndex = prizes.findIndex(p => p.id === winningPrize.id);
+                    const segmentAngle = 360 / prizes.length;
+                    // Add a small random offset for more natural spin
+                    const randomOffset = (Math.random() - 0.5) * segmentAngle * 0.8; 
+                    // Calculate target angle to stop at the winning segment
+                    const targetAngle = (360 - (winningSegmentIndex * segmentAngle)) - (segmentAngle / 2) + randomOffset;
+                    const totalRotation = 360 * 5 + targetAngle; // Spin 5 full rotations plus target angle
+                    wheel.style.transform = `rotate(${totalRotation}deg)`;
+
+                    // After the spin animation completes
+                    setTimeout(() => {
+                        userState.turns--; // Decrement local user turns
+                        showResultModal(winningPrize.name); // Show result modal
+                        spinBtn.dataset.spinning = 'false'; // Reset spinning flag
+                        updateUI(); // Update UI
+                        
+                        // Reset wheel rotation for the next spin without animation
+                        const currentRotation = totalRotation % 360;
+                        wheel.style.transition = 'none'; // Temporarily disable transition
+                        wheel.style.transform = `rotate(${currentRotation}deg)`;
+                        wheel.offsetHeight; // Trigger reflow to apply instant change
+                        wheel.style.transition = 'transform 5s ease-out'; // Re-enable transition
+                    }, 5500); // Duration matches CSS transition
+                } else {
+                    spinBtn.dataset.spinning = 'false';
+                    updateUI();
+                }
+            } catch (error) {
+                console.error("Transaction failed: ", error);
+                showSimpleModal("Lỗi", "Có lỗi xảy ra khi quay. Vui lòng thử lại.");
+                spinBtn.dataset.spinning = 'false';
+                updateUI();
+            }
+        }
+        
+        /**
+         * Displays a simple modal with a title and message.
+         * @param {string} title - The title of the modal.
+         * @param {string} message - The content message of the modal.
+         */
+        function showSimpleModal(title, message) {
+            modalTitle.textContent = title;
+            modalBody.innerHTML = `<p class="text-gray-600">${message}</p>`;
+            resultModal.classList.remove('hidden');
+        }
+
+        /**
+         * Displays the result modal after a spin, showing the won prize.
+         * Includes options to send email, Zalo message, or copy result message.
+         * @param {string} prizeName - The name of the prize won.
+         */
+        function showResultModal(prizeName) {
+            const adminPhone = '0817706606'; // Admin's Zalo phone number
+            const adminEmail = 'thuyenphung.tran@gmail.com'; // Admin's email
+            // Message to be sent to the admin
+            const resultMessage = `Khách hàng: ${userState.name} (SĐT: ${userState.phone}) đã trúng thưởng: "${prizeName}".`;
+            
+            modalTitle.textContent = '🎉 Chúc Mừng! 🎉';
+            modalBody.innerHTML = `
+                <p class="text-gray-700 mb-4 text-lg">Bạn đã trúng: <span class="font-bold text-red-600">${prizeName}</span></p>
+                <p class="text-sm text-gray-500 mb-6">Vui lòng gửi kết quả cho ban tổ chức để xác nhận và nhận giải.</p>
+                <div class="flex flex-col space-y-3">
+                    <a href="mailto:${adminEmail}?subject=${encodeURIComponent('Kết quả quay số trúng thưởng')}&body=${encodeURIComponent(resultMessage)}" target="_blank" class="w-full text-center bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition">Gửi Email</a>
+                    <a href="https://zalo.me/${adminPhone}" target="_blank" class="w-full text-center bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition">Nhắn tin Zalo</a>
+                    <button id="copy-zalo-msg" class="w-full bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition">Sao chép nội dung</button>
+                </div>
+            `;
+            resultModal.classList.remove('hidden');
+
+            // Event listener for copying the message to clipboard
+            document.getElementById('copy-zalo-msg').addEventListener('click', (e) => {
+                const button = e.target;
+                // Use document.execCommand('copy') for better compatibility in iframes
+                const textArea = document.createElement('textarea');
+                textArea.value = resultMessage;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    button.textContent = 'Đã sao chép!';
+                    setTimeout(() => { button.textContent = 'Sao chép nội dung'; }, 2000);
+                } catch (err) {
+                    console.error('Failed to copy text: ', err);
+                    button.textContent = 'Lỗi sao chép!';
+                }
+                document.body.removeChild(textArea);
+            });
+        }
+
+        // --- INITIALIZATION ---
+        /**
+         * Initializes the application: checks program dates, initializes Firebase,
+         * sets up prize data, and displays the main content.
+         */
+        async function init() {
+            // 1. Check if the program is active
+            if (!checkProgramTime()) return;
+
+            // 2. Initialize Firebase and authenticate
+            if (!await initializeFirebase()) return;
+            
+            // 3. Initialize and listen for prize inventory updates
+            await initializePrizes();
+            
+            // 4. Generate QR code for the current page URL
+            qrCodeImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(window.location.href)}`;
+            
+            // 5. Hide loader and show main app content
+            appLoader.classList.add('hidden');
+            appContent.classList.remove('hidden');
+
+            // 6. Add Event Listeners
+            registerFormEl.addEventListener('submit', handleRegistration);
+            shareBtn.addEventListener('click', handleShare);
+            spinBtn.addEventListener('click', spinWheel);
+            closeModalBtn.addEventListener('click', () => resultModal.classList.add('hidden'));
+        }
+
+        // Start the initialization process when the script loads
+        init();
+    </script>
+</body>
+</html>

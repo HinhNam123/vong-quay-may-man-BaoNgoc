@@ -223,7 +223,15 @@
         // App ID provided by the Canvas environment, or a default for local testing
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'lucky-draw-default';
         // Firebase configuration provided by the Canvas environment
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const firebaseConfig = {
+  apiKey: "AIzaSyBQ-1NpkzneZEWnvn8eQEKWB11yYsU7iyc",
+  authDomain: "vongquaymayman-656f6.firebaseapp.com",
+  projectId: "vongquaymayman-656f6",
+  storageBucket: "vongquaymayman-656f6.firebasestorage.app",
+  messagingSenderId: "717379540555",
+  appId: "1:717379540555:web:14a484512add3cf0419fce",
+  measurementId: "G-52KDVJ336L"
+};
         // Initial authentication token from Canvas environment
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 

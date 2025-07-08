@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vòng Quay May Mắn - Bảo Ngọc</title>
@@ -96,6 +96,32 @@
             max-width: 90%; 
             width: 400px; 
         }
+        /* Specific style for customer list modal to be wider */
+        #customer-list-modal .modal-content {
+            max-width: 90%;
+            width: 800px; /* Wider for table content */
+            text-align: left; /* Align text left for table */
+        }
+        #customer-list-modal table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        #customer-list-modal th, #customer-list-modal td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+            font-size: 0.875rem;
+        }
+        #customer-list-modal th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+        #customer-list-modal tbody tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
         /* Overlay for disabled app state (e.g., outside program dates) */
         .disabled-overlay { 
             position: absolute; 
@@ -168,6 +194,11 @@
                 <p id="global-share-message" class="text-sm text-gray-500 mt-2 hidden">Bạn đã nhận thưởng chia sẻ.</p>
             </div>
 
+            <!-- New: View Customer List Button -->
+            <div class="text-center mt-8">
+                <button id="view-customers-btn" class="bg-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-purple-700 transition transform hover:scale-105">Xem danh sách khách hàng</button>
+            </div>
+
             <!-- Lucky Wheel Section, hidden initially -->
             <div id="lucky-wheel-section" class="hidden">
                 <div class="flex flex-col lg:flex-row items-center justify-around gap-8">
@@ -227,6 +258,28 @@
                 <button id="close-share-modal-btn" class="mt-4 bg-gray-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-600 transition">Đóng</button>
             </div>
         </div>
+
+        <!-- New: Customer List Modal -->
+        <div id="customer-list-modal" class="modal-backdrop hidden">
+            <div class="modal-content">
+                <h2 class="text-2xl font-bold mb-4">Danh Sách Khách Hàng Đã Quay Số</h2>
+                <div class="overflow-x-auto max-h-[60vh] overflow-y-auto">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr>
+                                <th>Tên Khách Hàng</th>
+                                <th>Số Điện Thoại</th>
+                                <th>Phần Thưởng Đã Trúng</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customer-list-table-body">
+                            <!-- Customer data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+                <button id="close-customer-list-modal-btn" class="mt-6 bg-gray-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-600 transition">Đóng</button>
+            </div>
+        </div>
     </div>
 
     <!-- Firebase SDKs (Compat versions for global access) -->
@@ -240,8 +293,8 @@
         // Program start and end dates (Vietnam time, GMT+7)
         const START_DATE = new Date('2025-07-04T00:00:00+07:00'); 
         const END_DATE = new Date('2025-08-08T23:59:59+07:00');
-        // App ID provided by the Canvas environment, or a default for local testing
-        const appId = 'vong-quay-may-man-BaoNgoc'; // Hardcoded for GitHub Pages
+        // App ID for Firestore data paths
+        const appId = 'vong-quay-may-man-BaoNgoc'; 
         // Firebase configuration (REPLACE WITH YOUR ACTUAL FIREBASE CONFIG)
         const firebaseConfig = {
   apiKey: "AIzaSyBQ-1NpkzneZEWnvn8eQEKWB11yYsU7iyc",
@@ -253,7 +306,7 @@
   measurementId: "G-52KDVJ336L"
 };
         // Initial authentication token from Canvas environment (not used on GitHub Pages directly)
-        const initialAuthToken = null; // Set to null as it's not provided by GitHub Pages
+        const initialAuthToken = null; 
 
         // --- DOM ELEMENTS ---
         const appLoader = document.getElementById('app-loader');
@@ -264,7 +317,6 @@
         const registerFormEl = document.getElementById('register');
         const registerBtn = document.getElementById('register-btn');
         const spinBtn = document.getElementById('spin-btn');
-        // Removed old shareBtn as it's replaced by global-share-btn
         const wheel = document.getElementById('wheel');
         const turnsLeftDisplay = document.querySelector('#turns-left span');
         const prizeListUl = document.getElementById('prize-list');
@@ -274,7 +326,7 @@
         const closeModalBtn = document.getElementById('close-modal-btn');
         const qrCodeImg = document.getElementById('qr-code-img');
 
-        // New DOM elements for global share section and share modal
+        // Elements for global share section and share modal
         const globalShareSection = document.getElementById('global-share-section');
         const globalShareBtn = document.getElementById('global-share-btn');
         const globalShareMessage = document.getElementById('global-share-message');
@@ -285,6 +337,12 @@
         const shareFacebookBtn = document.getElementById('share-facebook-btn');
         const confirmShareBtn = document.getElementById('confirm-share-btn');
         const closeShareModalBtn = document.getElementById('close-share-modal-btn');
+
+        // New: Elements for Customer List Modal
+        const viewCustomersBtn = document.getElementById('view-customers-btn');
+        const customerListModal = document.getElementById('customer-list-modal');
+        const customerListTableBody = document.getElementById('customer-list-table-body');
+        const closeCustomerListModalBtn = document.getElementById('close-customer-list-modal-btn');
 
 
         // --- FIREBASE & APPLICATION STATE ---
@@ -302,10 +360,10 @@
             { id: 'prize05', name: 'Phiếu quà tặng 20.000đ', quantity: 10, color: '#9b59b6', order: 5 },
             { id: 'prize06', name: 'Sâm Hàn Quốc 6 tuổi', quantity: 10, color: '#e67e22', order: 6 },
             { id: 'prize07', name: 'Phiếu quà tặng 50.000đ', quantity: 5, color: '#1abc9c', order: 7 },
-            { id: 'prize08', name: 'Phiếu quà tặng 1.000đ', quantity: 30, color: '#a5b4fc', order: 8 }, 
+            { id: 'prize08', name: 'Phiếu quà tặng 1.000đ', quantity: 60, color: '#a5b4fc', order: 8 }, // Updated quantity: 30 + 30 = 60
             { id: 'prize09', name: 'Phiếu quà tặng 2.000đ', quantity: 30, color: '#7dd3fc', order: 9 }, 
             { id: 'prize10', name: 'Hủ hít Hongthai 5g', quantity: 5, color: '#f9a8d4', order: 10 },
-            { id: 'prize11', name: 'Chúc bạn may mắn lần sau', quantity: 20, color: '#bdc3c7', order: 11 }, // New prize added
+            { id: 'prize11', name: 'Chúc bạn may mắn lần sau', quantity: 40, color: '#bdc3c7', order: 11 }, // Updated quantity: 20 + 20 = 40
         ];
 
         // --- FUNCTIONS ---
@@ -762,6 +820,43 @@
             });
         }
 
+        /**
+         * Fetches and displays the list of customers and their won prizes.
+         */
+        async function showCustomerListModal() {
+            customerListTableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-500">Đang tải dữ liệu...</td></tr>';
+            customerListModal.classList.remove('hidden');
+
+            try {
+                const usersRef = db.collection(`artifacts/${appId}/public/data/users`);
+                const snapshot = await usersRef.get();
+                
+                let customersHtml = '';
+                if (snapshot.empty) {
+                    customersHtml = '<tr><td colspan="3" class="text-center py-4 text-gray-500">Chưa có khách hàng nào.</td></tr>';
+                } else {
+                    snapshot.forEach(doc => {
+                        const userData = doc.data();
+                        const wins = userData.wins || [];
+                        const wonPrizes = wins.map(win => win.prizeName).join(', ') || 'Chưa trúng giải nào';
+                        
+                        customersHtml += `
+                            <tr>
+                                <td>${userData.name || 'N/A'}</td>
+                                <td>${userData.phone || 'N/A'}</td>
+                                <td>${wonPrizes}</td>
+                            </tr>
+                        `;
+                    });
+                }
+                customerListTableBody.innerHTML = customersHtml;
+
+            } catch (error) {
+                console.error("Error fetching customer list:", error);
+                customerListTableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-red-500">Lỗi khi tải danh sách khách hàng.</td></tr>';
+            }
+        }
+
         // --- INITIALIZATION ---
         /**
          * Initializes the application: checks program dates, initializes Firebase,
@@ -789,11 +884,15 @@
             spinBtn.addEventListener('click', spinWheel);
             closeModalBtn.addEventListener('click', () => resultModal.classList.add('hidden'));
             
-            // New event listeners for global share button and share modal
+            // Event listeners for global share button and share modal
             globalShareBtn.addEventListener('click', openShareModal);
             closeShareModalBtn.addEventListener('click', () => shareModal.classList.add('hidden'));
             copyShareLinkBtn.addEventListener('click', copyShareLink);
             confirmShareBtn.addEventListener('click', confirmShareBonus);
+
+            // New: Event listeners for Customer List Modal
+            viewCustomersBtn.addEventListener('click', showCustomerListModal);
+            closeCustomerListModalBtn.addEventListener('click', () => customerListModal.classList.add('hidden'));
         }
 
         // Start the initialization process when the script loads
